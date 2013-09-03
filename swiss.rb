@@ -1,4 +1,3 @@
-require 'pry'
 class Swiss
   attr_accessor :players
   attr_accessor :current_pairs
@@ -102,7 +101,6 @@ class Swiss
         end
 
         potential_pairing = nil
-        # TODO: correctly check old pairing by identity not order
 
         eligible_pool.each do |eligible|
           potential_pairing = [carryover[0], eligible[0]]
