@@ -3,7 +3,9 @@ class Swiss
   attr_accessor :current_pairs
   attr_accessor :used_pairs
 
-  def initialize(num_players)
+  def initialize
+    puts "Number of players?"
+    num_players = gets.chomp.to_i
     self.players = {}
     self.used_pairs = []
     num_players.times do |i|
@@ -173,7 +175,7 @@ class Swiss
 end
 
 
-sw = Swiss.new(8)
+sw = Swiss.new
 sw.round_one
 sw.retrieve_scores(1)
 sw.round_two
