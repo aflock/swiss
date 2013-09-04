@@ -5,30 +5,15 @@ class Swiss
 
   def initialize
     puts "Number of players?"
-    num_players = gets.chomp.to_i
-    self.players = {}
-    self.used_pairs = []
-    num_players.times do |i|
+    self.players = gets.chomp.to_i.times.map do |i|
       puts "Name of player #{i}?"
-      name = gets.chomp
-      self.players[i] = { name: name, match_points: 0, game_points: 0 }
+      { name: gets.chomp, match_points: 0, game_points: 0 }
     end
   end
 
   def round_one
-    # pair players
-    self.current_pairs = []
-    nums = self.players.keys
-    while nums.length > 1 do
-      pairing = nums.sample(2)
-      nums = nums - pairing
-      self.current_pairs << pairing
-    end
-    if nums.length > 0 # someone gets a bye
-      self.current_pairs << nums
-    end
-
-    self.announce_pairings
+    self.current_pairs = players.shuffle.each_slice(2).to_a # pair players
+    announce_pairings
   end
 
   def announce_pairings
@@ -37,12 +22,10 @@ class Swiss
     puts "###################################"
     self.current_pairs.each do |pair|
       if pair.length == 1
-        puts "#{players[pair[0]][:name]} gets a bye"
+        puts "#{pair[0][:name]} gets a bye"
         puts "----------------"
       else
-        p1 = players[pair[0]]
-        p2 = players[pair[1]]
-        puts "#{p1[:name]} VS #{p2[:name]}"
+        puts "#{pair[0][:name]} VS #{pair[1][:name]}"
         puts "----------------"
       end
     end
@@ -59,8 +42,8 @@ class Swiss
         players[pair[0]][:match_points] += 1
         next
       end
-      p1 = players[pair[0]]
-      p2 = players[pair[1]]
+      p1 = pair[0]
+      p2 = pair[1]
 
       puts "#{p1[:name]}?"
       score = gets.strip.to_i
