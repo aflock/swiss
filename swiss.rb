@@ -173,7 +173,9 @@ class Swiss
 end
 
 
-sw = Swiss.new(8)
+puts "How many players?"
+num = gets.chomp.to_i
+sw = Swiss.new(num)
 sw.round_one
 sw.retrieve_scores(1)
 sw.round_two
@@ -181,4 +183,3 @@ sw.retrieve_scores(2)
 sw.round_two
 sw.retrieve_scores(3)
 sw.announce_winners
-
