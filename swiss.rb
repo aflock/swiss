@@ -7,7 +7,7 @@ class Swiss
     self.players = {}
     self.used_pairs = []
     num_players.times do |i|
-      puts "Name of player #{i}?"
+      puts "Name of player #{i+1}?"
       name = gets.chomp
       self.players[i] = { name: name, match_points: 0, game_points: 0 }
     end
