@@ -49,9 +49,7 @@ class Swiss
   end
 
   def announce_scores
-    puts "|>|>|>|>|>|>|>|>|>|>|>|>|>|>|>|>|>|"
-    puts "|<|<|<|<|<|<|<|<|<|<|<|<|<|<|<|<|<|"
-    puts "Scores after round #{current_round}:"
+    puts_announcement "Scores after round #{current_round}:"
     players.each { |p| puts "#{p.name} :: #{p.match_points}" }
   end
 
@@ -110,7 +108,7 @@ class Swiss
       end
     end
 
-    current_pairs = []
+    self.current_pairs = []
     announce_scores
   end
 
@@ -126,10 +124,6 @@ class Player
     self.name = opts[:name] || "Player #{(0...4).map{(65+rand(26)).chr.upcase}.join}" # "Player XASB"
     self.game_points = 0
     self.match_points = 0
-  end
-
-  def ==(another_player)
-    self.name == another_player.name
   end
 
   def award_bye_points
