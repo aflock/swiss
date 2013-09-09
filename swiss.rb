@@ -1,7 +1,6 @@
 class Swiss
   attr_accessor :players
   attr_accessor :current_pairs
-  attr_accessor :used_pairs
   attr_accessor :current_round
   attr_accessor :number_of_rounds
 
@@ -110,8 +109,7 @@ class Swiss
         pair.each { |p| p.award_match_and_game_points }
       end
     end
-    #write pairs to 'used_pairs' to prevent rematches
-    used_pairs = used_pairs.to_a + self.current_pairs.clone
+
     current_pairs = []
     announce_scores
   end
@@ -146,10 +144,6 @@ class Player
     puts "Game score results for #{name} (3 for EACH win, 1 for EACH draw, 0 for loss):"
     self.game_points += gets.chomp.to_i
   end
-end
-
-class Match
-
 end
 
 
