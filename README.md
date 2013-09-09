@@ -1,0 +1,5 @@
+To use:
+
+```
+$ bin/swiss
+```
