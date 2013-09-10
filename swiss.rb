@@ -92,7 +92,8 @@ class Swiss
       else
         rand(100) <=> rand(100)
       end
-    end
+    end.reverse
+
     self.current_pairs = sorted_players.each_slice(2).to_a
     announce_pairings
     retrieve_scores
