@@ -93,7 +93,7 @@ class Swiss
         rand(100) <=> rand(100)
       end
     end
-    self.current_pairs = sorted_players.shuffle.each_slice(2).to_a
+    self.current_pairs = sorted_players.each_slice(2).to_a
     announce_pairings
     retrieve_scores
   end
