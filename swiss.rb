@@ -1,185 +1,145 @@
 class Swiss
   attr_accessor :players
   attr_accessor :current_pairs
-  attr_accessor :used_pairs
+  attr_accessor :current_round
+  attr_accessor :number_of_rounds
 
-  def initialize(num_players)
-    self.players = {}
-    self.used_pairs = []
-    num_players.times do |i|
-      puts "Name of player #{i+1}?"
+  def initialize(opts = {})
+    self.current_round = 1
+    puts "Number of players?"
+    self.players = gets.chomp.to_i.times.map do |i|
+      puts "Name of player #{i + 1}?"
       name = gets.chomp
-      self.players[i] = { name: name, match_points: 0, game_points: 0 }
+      name = nil if name.empty?
+      Player.new(:name => name)
     end
+    self.number_of_rounds = opts[:number_of_rounds] || calculate_rounds_required(players.size)
   end
 
-  def round_one
-    # pair players
-    self.current_pairs = []
-    nums = self.players.keys
-    while nums.length > 1 do
-      pairing = nums.sample(2)
-      nums = nums - pairing
-      self.current_pairs << pairing
+  def begin!
+    while current_round != (number_of_rounds + 1)
+      next_round!
+      self.current_round += 1
     end
-    if nums.length > 0 # someone gets a bye
-      self.current_pairs << nums
-    end
+    announce_winners
+    exit
+  end
 
-    self.announce_pairings
+  private
+
+  def puts_announcement(text, options = {})
+    puts 80.times.map{ options[:character] || "#" }.to_a.join("") # magic number, terminal width
+    announcement_string = (39 - (text.length / 2)).times.map{ options[:character] || "#" }.to_a.join("")
+    announcement_string += " #{text} "
+    announcement_string = announcement_string.ljust(80, '#')
+    puts announcement_string
+    puts 80.times.map{ options[:character] || "#" }.to_a.join("")
   end
 
   def announce_pairings
-    puts "###################################"
-    puts "########### Pairings: #############"
-    puts "###################################"
-    self.current_pairs.each do |pair|
+    puts_announcement("Pairings:")
+    current_pairs.each do |pair|
       if pair.length == 1
-        puts "#{players[pair[0]][:name]} gets a bye"
-        puts "----------------"
+        puts "#{pair[0].name} gets a bye"
       else
-        p1 = players[pair[0]]
-        p2 = players[pair[1]]
-        puts "#{p1[:name]} VS #{p2[:name]}"
-        puts "----------------"
+        puts "#{pair[0].name} VS #{pair[1].name}"
       end
+      puts "----------------"
     end
   end
 
-  def retrieve_scores(round_num)
-    puts "###################################"
-    puts "###### Scoring for Round #{round_num}: "
-    puts "###################################"
-    puts "Enter match score results for players (3 for win, 1 for draw, 0 for loss):"
-    self.current_pairs.each_with_index do |pair|
-      if pair.length == 1 #bye
-        players[pair[0]][:game_points] += 3
-        players[pair[0]][:match_points] += 1
-        next
-      end
-      p1 = players[pair[0]]
-      p2 = players[pair[1]]
-
-      puts "#{p1[:name]}?"
-      score = gets.strip.to_i
-      players[pair[0]][:game_points] += score
-      if score > 1 # match win
-        players[pair[0]][:match_points] += 1
-      end
-
-      puts "#{p2[:name]}?"
-      score = gets.strip.to_i
-      players[pair[1]][:game_points] += score
-      if score > 1 # match win
-        players[pair[1]][:match_points] += 1
-      end
-    end
-    #write pairs to 'used_pairs' to prevent rematches
-    self.used_pairs += self.current_pairs.clone
-    self.current_pairs = []
-
-    puts "|>|>|>|>|>|>|>|>|>|>|>|>|>|>|>|>|>|"
-    puts "|<|<|<|<|<|<|<|<|<|<|<|<|<|<|<|<|<|"
-    puts "Scores after round #{round_num}:"
-    players.each_value do |player|
-      puts "#{player[:name]} :: #{player[:game_points]} "
-    end
-  end
-
-  def round_two
-    carryover = nil
-    # pair players with similar scores
-    unassigned_players = players.map do |k,v|
-      [k, v[:game_points]]
-    end.sort_by{ |i| i[1] }.reverse
-
-    while unassigned_players.length > 1 do
-      if carryover
-        p = unassigned_players[1]
-        eligible_pool = unassigned_players.select do |eligible|
-          eligible[1] == p[1]
-        end
-
-        potential_pairing = nil
-
-        eligible_pool.each do |eligible|
-          potential_pairing = [carryover[0], eligible[0]]
-          unless self.pair_has_already_played?(potential_pairing)
-            self.current_pairs << potential_pairing
-            eligible_pool.delete(eligible)
-            unassigned_players.delete(eligible)
-            unassigned_players.delete(carryover)
-            carryover = nil
-            break
-          end
-        end
-      else
-        p = unassigned_players.first
-        eligible_pool = unassigned_players.select do |eligible|
-          eligible[1] == p[1]
-        end
-      end
-
-
-      while eligible_pool.length > 1
-        pairing = eligible_pool.sample(2)
-        numeric_pairing = pairing.map{ |t| t[0] }
-
-        # don't rematch
-        next if self.pair_has_already_played?(numeric_pairing)
-
-        self.current_pairs << numeric_pairing
-        pairing.each do |selected|
-          eligible_pool.delete(selected)
-          unassigned_players.delete(selected)
-        end
-      end
-
-
-      if eligible_pool.length == 1
-        carryover = eligible_pool.first
-      end
-
-      #puts "unassigned player: #{unassigned_players.length}"
-    end
-
-    if unassigned_players.length == 1
-      self.current_pairs << [unassigned_players.first[0]]
-    end
-
-    self.announce_pairings
-  end
-
-  def pair_has_already_played?(pairing)
-    self.used_pairs.each do |used_pair|
-      if used_pair.sort == pairing.sort
-        return true
-      end
-    end
-    return false
+  def announce_scores
+    puts_announcement "Scores after round #{current_round}:"
+    players.each { |p| puts "#{p.name} :: #{p.match_points}" }
   end
 
   def announce_winners
-    puts "Final Scores:"
-    final_scores = players.values.map do |player|
-      match_score = player[:match_points]
-      game_score = player[:game_points]
-      [player[:name], (game_score + 0.1*match_score)]
+    puts_announcement "Final Scores:"
+    players.sort_by{ |p| p.match_points }.reverse.each_with_index do |player, index|
+      puts "#{index + 1}. #{player.name} :: (#{player.match_points})"
     end
-    final_scores.sort_by{ |i| i[1] }.reverse.each_with_index do |player, index|
-      puts "#{index + 1}. #{player[0]} :: (#{player[1]})"
+  end
+
+  def calculate_rounds_required(num_players)
+    case num_players
+    when 1..8
+      3
+    when 9..16
+      4
+    when 17..32
+      5
+    else
+      raise 'Too many players!'
     end
+  end
+
+  def initial_round
+    self.current_pairs = players.shuffle.each_slice(2).to_a # pair players
+    announce_pairings
+    retrieve_scores
+  end
+
+  def next_round!
+    current_round == 1 ? initial_round : regular_round
+  end
+
+  def regular_round
+    # pair players with the same match points against each other randomly
+    # DCI says you do not use tiebreakers when pairing
+    sorted_players = players.sort do |p1,p2|
+      if p1.match_points != p2.match_points
+        p1.match_points <=> p2.match_points
+      else
+        rand(100) <=> rand(100)
+      end
+    end
+    self.current_pairs = sorted_players.shuffle.each_slice(2).to_a
+    announce_pairings
+    retrieve_scores
+  end
+
+  def retrieve_scores
+    puts_announcement("Scoring for Round #{current_round}:")
+    current_pairs.each do |pair|
+      if pair.size == 1 #bye
+        pair[0].award_bye_points
+      else
+        pair.each { |p| p.award_match_and_game_points }
+      end
+    end
+
+    self.current_pairs = []
+    announce_scores
+  end
+
+end
+
+class Player
+  attr_accessor :name
+  attr_accessor :match_points
+  attr_accessor :game_points
+  attr_accessor :matches
+
+  def initialize(opts = {})
+    self.name = opts[:name] || "Player #{(0...4).map{(65+rand(26)).chr.upcase}.join}" # "Player XASB"
+    self.game_points = 0
+    self.match_points = 0
+  end
+
+  def award_bye_points
+    self.game_points += 6
+    self.match_points += 3
+  end
+
+  def award_match_and_game_points
+    puts "Match score results for #{name} (3 for win, 1 for draw, 0 for loss):"
+    self.match_points += gets.chomp.to_i
+
+    puts "Game score results for #{name} (3 for EACH win, 1 for EACH draw, 0 for loss):"
+    self.game_points += gets.chomp.to_i
   end
 end
 
 
-puts "How many players?"
-num = gets.chomp.to_i
-sw = Swiss.new(num)
-sw.round_one
-sw.retrieve_scores(1)
-sw.round_two
-sw.retrieve_scores(2)
-sw.round_two
-sw.retrieve_scores(3)
-sw.announce_winners
+sw = Swiss.new
+sw.begin!
