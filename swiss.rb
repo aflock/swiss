@@ -50,13 +50,13 @@ class Swiss
 
   def announce_scores
     puts_announcement "Scores after round #{current_round}:"
-    players.each { |p| puts "#{p.name} :: #{p.match_points}" }
+    players.each { |p| puts "#{p.name} :: Match Points - #{p.match_points} / Game Points - #{p.game_points}"}
   end
 
   def announce_winners
     puts_announcement "Final Scores:"
     players.sort_by{ |p| p.match_points }.reverse.each_with_index do |player, index|
-      puts "#{index + 1}. #{player.name} :: (#{player.match_points})"
+      puts "#{index + 1}. #{player.name} :: Match Points - #{player.match_points} / Game Points - #{player.game_points}"
     end
   end
 
