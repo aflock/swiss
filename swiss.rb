@@ -1,3 +1,4 @@
+DEBUG = true
 class Swiss
   attr_accessor :players
   attr_accessor :used_pairs
@@ -6,13 +7,20 @@ class Swiss
   attr_accessor :number_of_rounds
 
   def initialize(opts = {})
+
     self.current_round = 1
     puts "Number of players?"
-    self.players = gets.chomp.to_i.times.map do |i|
-      puts "Name of player #{i + 1}?"
-      name = gets.chomp
-      name = nil if name.empty?
-      Player.new(name: name, id: i)
+    if DEBUG
+      self.players = (0..6).to_a.map do |i|
+        Player.new(name: "p #{i}", id: i)
+      end
+    else
+      self.players = gets.chomp.to_i.times.map do |i|
+        puts "Name of player #{i + 1}?"
+        name = gets.chomp
+        name = nil if name.empty?
+        Player.new(name: name, id: i)
+      end
     end
     self.used_pairs = []
     self.number_of_rounds = opts[:number_of_rounds] || calculate_rounds_required(players.size)
@@ -26,8 +34,6 @@ class Swiss
     announce_winners
     exit
   end
-
-  private
 
   def puts_announcement(text, options = {})
     puts 80.times.map{ options[:character] || "#" }.to_a.join("") # magic number, terminal width
@@ -44,6 +50,8 @@ class Swiss
       if pair.length == 1
         puts "#{pair[0].name} gets a bye"
       else
+        puts "just #{pair[0]}"
+        puts "#{pair[0]} and #{pair[0].id}"
         used_pairs << [pair[0].id, pair[1].id]
         puts "#{pair[0].name} VS #{pair[1].name}"
       end
@@ -97,7 +105,7 @@ class Swiss
 
   def valid_pairings(user_ids)
     user_ids.combination(2).to_a.reject do |pairing|
-      self.pair_has_already_played(pairing)
+      self.pair_has_already_played?(pairing)
     end
   end
 
@@ -133,12 +141,12 @@ class Swiss
 
   def sort_by_best_match(combos)
     combos.sort do |c1, c2|
-      combo1_p1 = self.players.select{ |p| p.id == c1[0] }
-      combo1_p2 = self.players.select{ |p| p.id == c1[1] }
+      combo1_p1 = self.players.select{ |p| p.id == c1[0] }[0]
+      combo1_p2 = self.players.select{ |p| p.id == c1[1] }[0]
       combo1_score = 1.0/((combo1_p1.match_points - combo1_p2.match_points) + 0.1* (combo1_p1.game_points - combo1_p2.game_points))
 
-      combo2_p1 = self.players.select{ |p| p.id == c2[0] }
-      combo2_p2 = self.players.select{ |p| p.id == c2[1] }
+      combo2_p1 = self.players.select{ |p| p.id == c2[0] }[0]
+      combo2_p2 = self.players.select{ |p| p.id == c2[1] }[0]
       combo2_score = 1.0/((combo2_p1.match_points - combo2_p2.match_points) + 0.1* (combo2_p1.game_points - combo2_p2.game_points))
 
       combo2_score <=> combo1_score
@@ -168,12 +176,13 @@ class Swiss
     end.reverse
     self.current_pairs = sorted_players.each_slice(2).to_a
 
+    need_swap = false
     self.current_pairs.each_with_index do |pair, i|
-      if pair_has_already_played(pair.map(&:id))
-        pairs_needing_swap << i
+      if pair_has_already_played?(pair.map(&:id))
+        need_swap = true
       end
     end
-    if pairs_needing_swap.length > 0
+    if need_swap
       tree_pair()
     end
 
@@ -183,23 +192,23 @@ class Swiss
     #groups = players.group_by(&:match_points).values
     #groups.each_with_index do |group, i|
 
-      #while group.length > 1 do
-        #potential_pair = group.sample(2)
-        #pair_ids = [pair[0].id, pair[1].id]
-        #unless pair_has_already_played(pair_ids)
-          #current_pairs << potential_pair
-          #group.delete(potential_pair[0])
-          #group.delete(potential_pair[1])
-        #end
-      #end
+    #while group.length > 1 do
+    #potential_pair = group.sample(2)
+    #pair_ids = [pair[0].id, pair[1].id]
+    #unless pair_has_already_played(pair_ids)
+    #current_pairs << potential_pair
+    #group.delete(potential_pair[0])
+    #group.delete(potential_pair[1])
+    #end
+    #end
 
-      #if remaining_player = group[0] #an extra player will be bumped to the next group or given a bye
-        #if next_group = groups[i+1]
-          #next_group << remaining_player
-        #else
-          #current_pairs << remaining_player
-        #end
-      #end
+    #if remaining_player = group[0] #an extra player will be bumped to the next group or given a bye
+    #if next_group = groups[i+1]
+    #next_group << remaining_player
+    #else
+    #current_pairs << remaining_player
+    #end
+    #end
     #end
 
 
@@ -243,11 +252,17 @@ class Player
   end
 
   def award_match_and_game_points
-    puts "Match score results for #{name} (3 for win, 1 for draw, 0 for loss):"
-    self.match_points += gets.chomp.to_i
+    if DEBUG
+      self.match_points += rand(10) % 3
+      self.game_points += rand(10) % 6
+    else
+      puts "Match score results for #{name} (3 for win, 1 for draw, 0 for loss):"
 
-    puts "Game score results for #{name} (3 for EACH win, 1 for EACH draw, 0 for loss):"
-    self.game_points += gets.chomp.to_i
+      self.match_points += gets.chomp.to_i
+
+      puts "Game score results for #{name} (3 for EACH win, 1 for EACH draw, 0 for loss):"
+      self.game_points += gets.chomp.to_i
+    end
   end
 end
 
