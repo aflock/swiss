@@ -1,3 +1,4 @@
+require 'pry'
 DEBUG = true
 class Swiss
   attr_accessor :players
@@ -11,7 +12,7 @@ class Swiss
     self.current_round = 1
     puts "Number of players?"
     if DEBUG
-      self.players = (0..6).to_a.map do |i|
+      self.players = (0..3).to_a.map do |i|
         Player.new(name: "p #{i}", id: i)
       end
     else
@@ -50,8 +51,6 @@ class Swiss
       if pair.length == 1
         puts "#{pair[0].name} gets a bye"
       else
-        puts "just #{pair[0]}"
-        puts "#{pair[0]} and #{pair[0].id}"
         used_pairs << [pair[0].id, pair[1].id]
         puts "#{pair[0].name} VS #{pair[1].name}"
       end
@@ -109,12 +108,6 @@ class Swiss
     end
   end
 
-  def swap_pairs(pairs, pairs_needing_swap)
-    user_ids = player_ids
-    valid_pairings = valid_pairings(user_ids)
-    raise 'no more valid pairs' if valid_pairings*2 < user_ids.length
-  end
-
   def player_ids
     self.players.map(&:id)
   end
@@ -154,13 +147,15 @@ class Swiss
   end
 
   def tree_pair
+    self.current_pairs = []
     potential_pairings = valid_pairings(player_ids)
     sorted_potential_pairs = sort_by_best_match(potential_pairings)
     one_true_path = find_combos(sorted_potential_pairs)
     one_true_path.each do |combo|
-      player1 = self.players.select{ |p| p.id == combo[0] }
-      player2 = self.players.select{ |p| p.id == combo[0] }
+      player1 = self.players.find{ |p| p.id == combo[0] }
+      player2 = self.players.find{ |p| p.id == combo[1] }
       self.current_pairs << [player1, player2]
+      binding.pry if current_pairs.length > 4
     end
   end
 
@@ -179,38 +174,10 @@ class Swiss
     need_swap = false
     self.current_pairs.each_with_index do |pair, i|
       if pair_has_already_played?(pair.map(&:id))
-        need_swap = true
+        tree_pair()
+        break
       end
     end
-    if need_swap
-      tree_pair()
-    end
-
-
-    # this method of pairing will be less likely to have rematches but its still possible
-    # self.current_pairs = []
-    #groups = players.group_by(&:match_points).values
-    #groups.each_with_index do |group, i|
-
-    #while group.length > 1 do
-    #potential_pair = group.sample(2)
-    #pair_ids = [pair[0].id, pair[1].id]
-    #unless pair_has_already_played(pair_ids)
-    #current_pairs << potential_pair
-    #group.delete(potential_pair[0])
-    #group.delete(potential_pair[1])
-    #end
-    #end
-
-    #if remaining_player = group[0] #an extra player will be bumped to the next group or given a bye
-    #if next_group = groups[i+1]
-    #next_group << remaining_player
-    #else
-    #current_pairs << remaining_player
-    #end
-    #end
-    #end
-
 
     announce_pairings
     retrieve_scores
