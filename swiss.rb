@@ -20,6 +20,7 @@ class Swiss
     end
     self.used_pairs = []
     self.number_of_rounds = opts[:number_of_rounds] || Math::log(self.players.count, 2).ceil
+    puts_announcement("There will be #{self.number_of_rounds} rounds.")
   end
 
   def begin!
@@ -41,11 +42,11 @@ class Swiss
     announcement_string += " #{text} "
     announcement_string = announcement_string.ljust(80, DISPLAY_CHAR)
     puts announcement_string
-    puts DISPLAY_CHAR * 80 # magic number, terminal width
+    puts DISPLAY_CHAR * 80
   end
 
   def announce_pairings
-    puts_announcement("Pairings for round #{self.current_round}:")
+    puts_announcement("Pairings for Round #{self.current_round}:")
     current_pairs.each do |pair|
       if pair[0].id == -1
         puts "#{pair[1].name} gets a bye"
@@ -60,12 +61,7 @@ class Swiss
   end
 
   def pair_has_already_played?(pairing)
-    self.used_pairs.each do |used_pair|
-      if used_pair.sort == pairing.sort
-        return true
-      end
-    end
-    return false
+    self.used_pairs.any?{ |used_pair| used_pair.sort == pairing.sort }
   end
 
   def announce_scores
@@ -86,7 +82,6 @@ class Swiss
     retrieve_scores
   end
 
-
   def valid_pairings(user_ids)
     user_ids.combination(2).to_a.reject do |pairing|
       self.pair_has_already_played?(pairing)
@@ -96,8 +91,6 @@ class Swiss
   def player_ids
     self.players.map(&:id)
   end
-
-
 
   def sort_by_best_match(combos)
     combos.sort do |c1, c2|
@@ -112,7 +105,6 @@ class Swiss
       combo2_score <=> combo1_score
     end
   end
-
 
   def regular_round
     # pair players with the same match points against each other randomly
@@ -182,7 +174,6 @@ class Swiss
     self.current_pairs = []
     announce_scores
   end
-
 end
 
 class Player
