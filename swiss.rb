@@ -1,5 +1,3 @@
-require 'pry'
-DEBUG = true
 DISPLAY_CHAR = '~'
 class Swiss
   attr_accessor :players
@@ -11,20 +9,14 @@ class Swiss
   def initialize(opts = {})
     self.current_round = 1
     puts "Number of players?"
-    if DEBUG
-      self.players = (0..6).to_a.map do |i|
-        Player.new(name: "p #{i}", id: i)
-      end
-    else
-      self.players = gets.chomp.to_i.times.map do |i|
-        puts "Name of player #{i + 1}?"
-        name = gets.chomp
-        name = nil if name.empty?
-        Player.new(name: name, id: i)
-      end
+    self.players = gets.chomp.to_i.times.map do |i|
+      puts "Name of player #{i + 1}?"
+      name = gets.chomp
+      name = nil if name.empty?
+      Player.new(:name => name, :id => i)
     end
     if self.players.count.odd? # add bye player
-      self.players << Player.new(name: "Bye", id: -1, match_points: -1, game_points: -1)
+      self.players << Player.new(:name => "Bye", :id => -1, :match_points => -1, :game_points => -1)
     end
     self.used_pairs = []
     self.number_of_rounds = opts[:number_of_rounds] || Math::log(self.players.count, 2).ceil
@@ -39,6 +31,10 @@ class Swiss
     exit
   end
 
+  def next_round!
+    current_round == 1 ? initial_round : regular_round
+  end
+
   def puts_announcement(text)
     puts DISPLAY_CHAR * 80 # magic number, terminal width
     announcement_string = DISPLAY_CHAR * (39 - (text.length / 2))
@@ -49,7 +45,6 @@ class Swiss
   end
 
   def announce_pairings
-    binding.pry if current_pairs == []
     puts_announcement("Pairings for round #{self.current_round}:")
     current_pairs.each do |pair|
       if pair[0].id == -1
@@ -91,9 +86,6 @@ class Swiss
     retrieve_scores
   end
 
-  def next_round!
-    current_round == 1 ? initial_round : regular_round
-  end
 
   def valid_pairings(user_ids)
     user_ids.combination(2).to_a.reject do |pairing|
@@ -106,23 +98,6 @@ class Swiss
   end
 
 
-  def find_optimal_combos(valid_combinations, prior_path = [])
-    path_length_needed = self.players.count / 2
-    valid_combinations.each do |combo|
-      prior_path << combo
-      if prior_path.length == path_length_needed
-        return prior_path
-      else
-        remaining_ids = player_ids.reject{ |n| prior_path.flatten.include?(n) }
-        further_allowed_combos = sort_by_best_match(valid_pairings(remaining_ids))
-        if further_allowed_combos.length
-          return find_optimal_combos(further_allowed_combos, prior_path)
-        else
-          next
-        end
-      end
-    end
-  end
 
   def sort_by_best_match(combos)
     combos.sort do |c1, c2|
@@ -136,6 +111,27 @@ class Swiss
 
       combo2_score <=> combo1_score
     end
+  end
+
+
+  def regular_round
+    # pair players with the same match points against each other randomly
+    # DCI says you do not use tiebreakers when pairing
+    sorted_players = players.sort do |p1,p2|
+      if p1.match_points != p2.match_points
+        p1.match_points <=> p2.match_points
+      else
+        rand(100) <=> rand(100)
+      end
+    end.reverse
+    self.current_pairs = sorted_players.each_slice(2).to_a
+
+    if self.current_pairs.any?{ |pair| pair_has_already_played?(pair.map(&:id)) }
+      smart_pair()
+    end
+
+    announce_pairings
+    retrieve_scores
   end
 
   def smart_pair
@@ -153,28 +149,22 @@ class Swiss
     end
   end
 
-  def regular_round
-    # pair players with the same match points against each other randomly
-    # DCI says you do not use tiebreakers when pairing
-    sorted_players = players.sort do |p1,p2|
-      if p1.match_points != p2.match_points
-        p1.match_points <=> p2.match_points
-      else
-        rand(100) <=> rand(100)
-      end
-    end.reverse
-    self.current_pairs = sorted_players.each_slice(2).to_a
+  def find_optimal_combos(valid_combinations, prior_path = [])
+    path_length_needed = self.players.count / 2
+    valid_combinations.each do |combo|
+      prior_path << combo
 
-    need_swap = false
-    self.current_pairs.each_with_index do |pair, i|
-      if pair_has_already_played?(pair.map(&:id))
-        smart_pair()
-        break
+      return prior_path if prior_path.length == path_length_needed
+
+      remaining_ids = player_ids.reject{ |n| prior_path.flatten.include?(n) }
+      further_allowed_combos = sort_by_best_match(valid_pairings(remaining_ids))
+
+      if further_allowed_combos.length
+        return find_optimal_combos(further_allowed_combos, prior_path)
+      else
+        next
       end
     end
-
-    announce_pairings
-    retrieve_scores
   end
 
   def retrieve_scores
@@ -205,8 +195,8 @@ class Player
   def initialize(opts = {})
     self.name = opts[:name] || "Player #{(0...4).map{(65+rand(26)).chr.upcase}.join}" # "Player XASB"
     self.id = opts[:id]
-    self.game_points = 0
-    self.match_points = 0
+    self.game_points = opts[:game_points] || 0
+    self.match_points = opts[:match_points] || 0
   end
 
   def award_bye_points
@@ -215,17 +205,12 @@ class Player
   end
 
   def award_match_and_game_points
-    if DEBUG
-      self.match_points += rand(10) % 3
-      self.game_points += rand(10) % 6
-    else
-      puts "Match score results for #{name} (3 for win, 1 for draw, 0 for loss):"
+    puts "Match score results for #{name} (3 for win, 1 for draw, 0 for loss):"
 
-      self.match_points += gets.chomp.to_i
+    self.match_points += gets.chomp.to_i
 
-      puts "Game score results for #{name} (3 for EACH win, 1 for EACH draw, 0 for loss):"
-      self.game_points += gets.chomp.to_i
-    end
+    puts "Game score results for #{name} (3 for EACH win, 1 for EACH draw, 0 for loss):"
+    self.game_points += gets.chomp.to_i
   end
 end
 
