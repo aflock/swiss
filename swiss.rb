@@ -1,5 +1,6 @@
 require 'pry'
 DEBUG = true
+DISPLAY_CHAR = '~'
 class Swiss
   attr_accessor :players
   attr_accessor :used_pairs
@@ -8,11 +9,10 @@ class Swiss
   attr_accessor :number_of_rounds
 
   def initialize(opts = {})
-
     self.current_round = 1
     puts "Number of players?"
     if DEBUG
-      self.players = (0..3).to_a.map do |i|
+      self.players = (0..6).to_a.map do |i|
         Player.new(name: "p #{i}", id: i)
       end
     else
@@ -23,8 +23,11 @@ class Swiss
         Player.new(name: name, id: i)
       end
     end
+    if self.players.count.odd? # add bye player
+      self.players << Player.new(name: "Bye", id: -1, match_points: -1, game_points: -1)
+    end
     self.used_pairs = []
-    self.number_of_rounds = opts[:number_of_rounds] || calculate_rounds_required(players.size)
+    self.number_of_rounds = opts[:number_of_rounds] || Math::log(self.players.count, 2).ceil
   end
 
   def begin!
@@ -36,24 +39,27 @@ class Swiss
     exit
   end
 
-  def puts_announcement(text, options = {})
-    puts 80.times.map{ options[:character] || "#" }.to_a.join("") # magic number, terminal width
-    announcement_string = (39 - (text.length / 2)).times.map{ options[:character] || "#" }.to_a.join("")
+  def puts_announcement(text)
+    puts DISPLAY_CHAR * 80 # magic number, terminal width
+    announcement_string = DISPLAY_CHAR * (39 - (text.length / 2))
     announcement_string += " #{text} "
-    announcement_string = announcement_string.ljust(80, '#')
+    announcement_string = announcement_string.ljust(80, DISPLAY_CHAR)
     puts announcement_string
-    puts 80.times.map{ options[:character] || "#" }.to_a.join("")
+    puts DISPLAY_CHAR * 80 # magic number, terminal width
   end
 
   def announce_pairings
-    puts_announcement("Pairings:")
+    binding.pry if current_pairs == []
+    puts_announcement("Pairings for round #{self.current_round}:")
     current_pairs.each do |pair|
-      if pair.length == 1
+      if pair[0].id == -1
+        puts "#{pair[1].name} gets a bye"
+      elsif pair[1].id == -1
         puts "#{pair[0].name} gets a bye"
       else
-        used_pairs << [pair[0].id, pair[1].id]
         puts "#{pair[0].name} VS #{pair[1].name}"
       end
+      used_pairs << [pair[0].id, pair[1].id]
       puts "----------------"
     end
   end
@@ -69,26 +75,13 @@ class Swiss
 
   def announce_scores
     puts_announcement "Scores after round #{current_round}:"
-    players.each { |p| puts "#{p.name} :: #{p.match_points}" }
+    players.each{ |p| puts "#{p.name} :: #{p.match_points}" if p.id != -1 }
   end
 
   def announce_winners
     puts_announcement "Final Scores:"
     players.sort_by{ |p| p.match_points }.reverse.each_with_index do |player, index|
-      puts "#{index + 1}. #{player.name} :: (#{player.match_points})"
-    end
-  end
-
-  def calculate_rounds_required(num_players)
-    case num_players
-    when 1..8
-      3
-    when 9..16
-      4
-    when 17..32
-      5
-    else
-      raise 'Too many players!'
+      puts "#{index + 1}. #{player.name} :: (#{player.match_points})" if player.id != -1
     end
   end
 
@@ -113,8 +106,7 @@ class Swiss
   end
 
 
-  def find_combos(valid_combinations, prior_path = [])
-    # right now just do even pairings
+  def find_optimal_combos(valid_combinations, prior_path = [])
     path_length_needed = self.players.count / 2
     valid_combinations.each do |combo|
       prior_path << combo
@@ -122,9 +114,9 @@ class Swiss
         return prior_path
       else
         remaining_ids = player_ids.reject{ |n| prior_path.flatten.include?(n) }
-        further_allowed_combos = valid_pairings(remaining_ids)
+        further_allowed_combos = sort_by_best_match(valid_pairings(remaining_ids))
         if further_allowed_combos.length
-          return find_combos(further_allowed_combos, prior_path)
+          return find_optimal_combos(further_allowed_combos, prior_path)
         else
           next
         end
@@ -134,28 +126,30 @@ class Swiss
 
   def sort_by_best_match(combos)
     combos.sort do |c1, c2|
-      combo1_p1 = self.players.select{ |p| p.id == c1[0] }[0]
-      combo1_p2 = self.players.select{ |p| p.id == c1[1] }[0]
+      combo1_p1 = self.players.find{ |p| p.id == c1[0] }
+      combo1_p2 = self.players.find{ |p| p.id == c1[1] }
       combo1_score = 1.0/((combo1_p1.match_points - combo1_p2.match_points) + 0.1* (combo1_p1.game_points - combo1_p2.game_points))
 
-      combo2_p1 = self.players.select{ |p| p.id == c2[0] }[0]
-      combo2_p2 = self.players.select{ |p| p.id == c2[1] }[0]
+      combo2_p1 = self.players.find{ |p| p.id == c2[0] }
+      combo2_p2 = self.players.find{ |p| p.id == c2[1] }
       combo2_score = 1.0/((combo2_p1.match_points - combo2_p2.match_points) + 0.1* (combo2_p1.game_points - combo2_p2.game_points))
 
       combo2_score <=> combo1_score
     end
   end
 
-  def tree_pair
+  def smart_pair
     self.current_pairs = []
     potential_pairings = valid_pairings(player_ids)
     sorted_potential_pairs = sort_by_best_match(potential_pairings)
-    one_true_path = find_combos(sorted_potential_pairs)
-    one_true_path.each do |combo|
+    optimal_combinations = find_optimal_combos(sorted_potential_pairs)
+    while optimal_combinations == [] # not sure why/how this happens but it does :(
+      optimal_combinations = find_optimal_combos(sorted_potential_pairs.shuffle!)
+    end
+    optimal_combinations.each do |combo|
       player1 = self.players.find{ |p| p.id == combo[0] }
       player2 = self.players.find{ |p| p.id == combo[1] }
       self.current_pairs << [player1, player2]
-      binding.pry if current_pairs.length > 4
     end
   end
 
@@ -174,7 +168,7 @@ class Swiss
     need_swap = false
     self.current_pairs.each_with_index do |pair, i|
       if pair_has_already_played?(pair.map(&:id))
-        tree_pair()
+        smart_pair()
         break
       end
     end
@@ -186,7 +180,9 @@ class Swiss
   def retrieve_scores
     puts_announcement("Scoring for Round #{current_round}:")
     current_pairs.each do |pair|
-      if pair.size == 1 #bye
+      if pair[0].id == -1
+        pair[1].award_bye_points
+      elsif pair[1].id == -1
         pair[0].award_bye_points
       else
         pair.each { |p| p.award_match_and_game_points }
